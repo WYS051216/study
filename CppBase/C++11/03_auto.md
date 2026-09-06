@@ -6,34 +6,58 @@
 * **语法**：`auto 变量名 = 初始值;` （必须初始化，否则编译器猜不出来）。
 
 ### 推导规则汇总 (核心考点) ⚠️
-这是面试中最喜欢问的细节，只需记住这三条铁律：
+这是面试中最喜欢问的细节，只需记住这四条铁律：
 
 1.  **`auto` 单独使用（值拷贝）**：
     * **规则**：会**丢弃**顶层的 `const` 和引用 `&`。
-    * **结果**：变量是一个全新的副本，修改它不会影响原数据。
+    * **结果**：变量是一个全新的副本，产生一次完整的拷贝，修改它不会影响原数据。
 2.  **`auto&`（引用）**：
     * **规则**：会**保留** `const` 属性。
-    * **结果**：变量是原数据的别名，如果原数据是 const，这里也是 const。
+    * **结果**：变量是原数据的别名。如果原数据是 const，推导出来也是 const；如果原数据可变，推导出来也可变（有误改风险）。
 3.  **`auto*`（指针）**：
-    * **规则**：会推导为指针类型，且**保留** `const` 属性。
+    * **规则**：等号右边必须传来一个指针，且**保留**底层的 `const` 属性。
+    * **结果**：用于明确接收可能为空的内存地址。
+4.  **`const auto&`（只读引用 / 企业级最佳实践）**：
+    * **规则**：无视右边的原始状态，**强制**给推导出来的类型加上 `const` 和 `&` 属性。
+    * **结果**：既保证了**零拷贝**（速度极快），又保证了**绝对安全**（无法修改原对象）。是基于范围的 for 循环中遍历复杂对象的最优解。
 
 ### 代码演示
 
 ```cpp
-int x = 10;
-const int cx = 20;
-const int& rx = x;
+#include <iostream>
+#include <vector>
+#include <string>
 
-// --- 规则 1: auto (值拷贝) ---
-auto a = cx;    // a 是 int (const 被丢弃)
-auto b = rx;    // b 是 int (const 和引用都被丢弃)
+int main() {
+    int x = 10;
+    const int cx = 20;
+    const int& rx = x;
 
-// --- 规则 2: auto& (引用) ---
-auto& c = cx;   // c 是 const int& (const 被保留)
-auto& d = rx;   // d 是 const int& (原样保留)
+    // --- 规则 1: auto (值拷贝) ---
+    auto a = cx;    // a 是 int (const 被丢弃)
+    auto b = rx;    // b 是 int (const 和引用都被丢弃)
 
-// --- 规则 3: auto* (指针) ---
-auto* e = &cx;  // e 是 const int* (保留 const)
+    // --- 规则 2: auto& (引用) ---
+    auto& c = cx;   // c 是 const int& (const 被保留)
+    auto& d = rx;   // d 是 const int& (原样保留)
+    auto& d2 = x;   // d2 是 int& (原数据可变，引用也可变)
+
+    // --- 规则 3: auto* (指针) ---
+    auto* e = &cx;  // e 是 const int* (保留 const，必须传指针)
+
+    // --- 规则 4: const auto& (只读引用) ---
+    const auto& f = x;  // f 是 const int& (强制变成只读引用)
+    // f = 100;         // ❌ 编译报错：绝对安全，不可修改
+
+    // 💡 黄金应用场景演示：遍历大型容器
+    std::vector<std::string> words = {"Hello", "C++11"};
+    for (const auto& w : words) {
+        // 无内存拷贝开销，且保证不会不小心改坏原数组里的字符串
+        std::cout << w << " ";
+    }
+    
+    return 0;
+}
 ```
 ## decltype 关键字
 
