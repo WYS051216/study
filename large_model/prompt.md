@@ -181,3 +181,75 @@
 * **兜底指令降幻觉 (Fallback Instructions)**
   * 用法：在末尾增加强约束指令（如“信息不足就回答不知道，绝不编造”）。
   * 价值：抑制大模型的发散联想与表现欲，保证输出的严谨性与安全性。
+
+## 调用大模型 API
+
+  ### 1. 环境准备
+  ```bash
+  pip install openai
+  ```
+
+  ### 2. 基础调用（OpenAI 兼容格式，DeepSeek 为例）
+  ```python
+  from openai import OpenAI
+
+  client = OpenAI(
+      api_key="你的密钥",
+      base_url="https://api.deepseek.com",
+  )
+
+  resp = client.chat.completions.create(
+      model="deepseek-chat",
+      messages=[{"role": "user", "content": "你好"}],
+  )
+  print(resp.choices[0].message.content)
+  ```
+
+  ### 3. 带「模板化 + 分隔符」的调用
+  ```python
+  def translate(text, language):
+      prompt = f"把 ###{text}### 翻译成 {language}，只输出翻译结果，不要解释"
+      resp = client.chat.completions.create(
+          model="deepseek-chat",
+          messages=[{"role": "user", "content": prompt}],
+      )
+      return resp.choices[0].message.content
+  ```
+
+  ### 4. 多轮对话（无状态 + messages 列表）
+  ```python
+  messages = [{"role": "system", "content": "你是一个简洁的助手"}]
+
+  while True:
+      user_input = input("你：")
+      if user_input in ("退出", "quit", "exit"):
+          break
+
+      # 把用户的话加进历史
+      messages.append({"role": "user", "content": user_input})
+
+      # 把【完整历史】发给模型
+      resp = client.chat.completions.create(
+          model="deepseek-chat",
+          messages=messages,
+      )
+      reply = resp.choices[0].message.content
+      print("AI：", reply)
+
+      # 把模型的回复也加进历史（下一轮它才「记得」）
+      messages.append({"role": "assistant", "content": reply})
+  ```
+
+  ### 5. 流式输出（打字机效果）
+  ```python
+  resp = client.chat.completions.create(
+      model="deepseek-chat",
+      messages=messages,
+      stream=True,   # 关键：开流式
+  )
+  for chunk in resp:
+      delta = chunk.choices[0].delta.content
+      if delta:
+          print(delta, end="", flush=True)
+  print()  # 结尾换行
+  ```
